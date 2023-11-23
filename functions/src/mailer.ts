@@ -1,6 +1,6 @@
 import * as nodemailer from "nodemailer";
 
-export const sendOTPEmail = async (email: string) =>  {
+export const sendOTPEmail = async (email: string, code: string) =>  {
     var transporter = nodemailer.createTransport({
         host: "live.smtp.mailtrap.io",
         port: 587,
@@ -14,11 +14,12 @@ export const sendOTPEmail = async (email: string) =>  {
         to: email,
         subject: "BeCapy account OTP Verification Code", // Subject line
         text: "BeCapy account OTP Verification Code", // plain text body
-        html: `<b>BeCapy account OTP Verification Code is: ${makeCode(6)}</b>`, // html body
+        html: `<b>BeCapy account OTP Verification Code is: ${code}</b>`, // html body
     });
+    return code;
 };
 
-function makeCode(length: number) {
+export const makeCode = (length: number) => {
     let result = '';
     const characters = '6213831738399302021937136317383981283183837313910440987654224128363531317339484739092730624110384';
     const charactersLength = characters.length;

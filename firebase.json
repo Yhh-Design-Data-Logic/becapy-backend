@@ -12,26 +12,9 @@
         ".git",
         "firebase-debug.log",
         "firebase-debug.*.log"
-      ]
-    },
-    {
-      "source": "becapy",
-      "codebase": "becapy",
-      "ignore": [
-        "node_modules",
-        ".git",
-        "firebase-debug.log",
-        "firebase-debug.*.log"
-      ]
-    },
-    {
-      "source": "becapy-shopify",
-      "codebase": "becapy-shopify",
-      "ignore": [
-        "node_modules",
-        ".git",
-        "firebase-debug.log",
-        "firebase-debug.*.log"
+      ],
+      "predeploy": [
+     
       ]
     }
   ],
