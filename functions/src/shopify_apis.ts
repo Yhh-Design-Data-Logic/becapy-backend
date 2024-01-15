@@ -45,10 +45,12 @@ export const shopifyProducts = onCall(async (request) => {
             result = prods;
             for (var i = 0; i < prods["products"].length; i++) {
                 var id = prods["products"][i].id;
-                fData.push({
-                    "id": id,
-                    "product": prods["products"][i]
-                });
+                if(String(id) != "6935766663235"){ // for the QR Code product.
+                    fData.push({ 
+                        "id": id,
+                        "product": prods["products"][i]
+                    });
+                }
             }
         });
 
@@ -63,6 +65,8 @@ export const getProductById = onCall(async (request) => {
         const id = request.data.id;
         const authHeader = `Basic ${Buffer.from(`${shopifyApiKey}:${shopifyPassword}`).toString("base64")}`;
         const url = `https://${shopifyShopName}/admin/api/${apiVersion}/products/${id}.json`;
+        const variantsUrl = `https://${shopifyShopName}/admin/api/${apiVersion}/products/${id}/variants.json`;
+        var map: Map<String, any> = new Map();
         var fData: any = [];
 
         await fetch(url, {
@@ -79,7 +83,19 @@ export const getProductById = onCall(async (request) => {
             });
             console.log("fData = " + fData);
         });
-        return fData;
+        map.set("data", fData);
+
+        /// For fetching the prices for all variants of this product.
+        await fetch(variantsUrl, {
+            headers: {
+                Authorization: authHeader,
+            },
+        }).then(async (result: any) => {
+            var variants = await result.json();
+            map.set("variants", variants);
+        });
+        
+        return map;
     } catch (error) {
         return error;
     }
@@ -91,7 +107,18 @@ export const getProductsByCollectionId = onCall(async (request) => {
         // const tShirtsProductsCollectionId = "277268529219";
         // const bagProductsCollectionId = "277396160579";
 
-        const id = request.data.id;
+        const type = request.data.type;
+        var id = "";
+        switch(type.toLowerCase()){
+            case "t-shirt-collections":
+                id = "277268529219";
+                break;
+            case "bag-collections":
+                id = "277396160579";
+                break;
+            default:
+                id = "277396226115";
+        }
 
         const authHeader = `Basic ${Buffer.from(`${shopifyApiKey}:${shopifyPassword}`).toString("base64")}`;
         const url = `https://${shopifyShopName}/admin/api/${apiVersion}/collections/${id}/products.json`;
@@ -103,7 +130,6 @@ export const getProductsByCollectionId = onCall(async (request) => {
             },
         }).then(async (result: any) => {
             var prods = await result.json();
-            result = prods;
             for (var i = 0; i < prods["products"].length; i++) {
                 var id = prods["products"][i].id;
                 fData.push({
@@ -118,6 +144,3 @@ export const getProductsByCollectionId = onCall(async (request) => {
         return error;
     }
 });
-
-
-
