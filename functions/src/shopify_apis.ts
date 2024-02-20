@@ -1,5 +1,7 @@
-import { onCall } from "firebase-functions/v2/https";
+/* eslint-disable max-len */
+import * as admin from "firebase-admin";
 
+import { onCall, onRequest } from "firebase-functions/v2/https";
 // export const shopifyProducts = onCall(async (data) => {
 //     try {
 //         const shopifyApiKey = "eee58d1b00b3eef5c9073b72d3a8dba7";
@@ -25,8 +27,12 @@ import { onCall } from "firebase-functions/v2/https";
 //     }
 // });
 
-const shopifyApiKey = "d331707162e8c5ec410ff2138e427c2e";
-const shopifyPassword = "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";
+// const shopifyApiKey = "d331707162e8c5ec410ff2138e427c2e";
+// const shopifyPassword = "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";
+
+const shopifyApiKey = "c0c79b8a5ab85c3588827e799cb7594c";
+const shopifyPassword = "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";
+
 const shopifyShopName = "209c5e-2.myshopify.com";
 const apiVersion = "2023-10";
 
@@ -45,8 +51,8 @@ export const shopifyProducts = onCall(async (request) => {
             result = prods;
             for (var i = 0; i < prods["products"].length; i++) {
                 var id = prods["products"][i].id;
-                if(String(id) != "6935766663235"){ // for the QR Code product.
-                    fData.push({ 
+                if (String(id) != "6935766663235") { // for the QR Code product.
+                    fData.push({
                         "id": id,
                         "product": prods["products"][i]
                     });
@@ -81,6 +87,8 @@ export const getProductById = onCall(async (request) => {
                 "id": id,
                 "product": prods["product"]
             });
+            console.log("id = " + id);
+            console.log("prods[product].id = " + prods["product"].id);
             console.log("fData = " + fData);
         });
         map.set("data", fData);
@@ -92,10 +100,13 @@ export const getProductById = onCall(async (request) => {
             },
         }).then(async (result: any) => {
             var variants = await result.json();
+            console.log("variants = " + variants);
             map.set("variants", variants);
         });
-        
-        return map;
+
+        console.log("map = " + map);
+
+        return fData;
     } catch (error) {
         return error;
     }
@@ -109,7 +120,7 @@ export const getProductsByCollectionId = onCall(async (request) => {
 
         const type = request.data.type;
         var id = "";
-        switch(type.toLowerCase()){
+        switch (type.toLowerCase()) {
             case "t-shirt-collections":
                 id = "277268529219";
                 break;
@@ -142,5 +153,77 @@ export const getProductsByCollectionId = onCall(async (request) => {
         return fData;
     } catch (error) {
         return error;
+    }
+});
+
+export const getCustomCollections = onRequest({ cors: true }, async (request, response) => {
+    try {
+        const authHeader = `Basic ${Buffer.from(`${shopifyApiKey}:${shopifyPassword}`).toString("base64")}`;
+        const url = `https://${shopifyShopName}/admin/api/${apiVersion}/custom_collections.json`;
+        let collections = {};
+        await fetch(url, {
+            headers: {
+                Authorization: authHeader,
+            },
+        }).then(async (result: any) => {
+            collections = await result.json();
+        });
+
+        response.status(200).send(collections);
+    } catch (error) {
+        response.status(400).send("Error!");
+    }
+});
+
+
+export const getProductsByCollectionIdHttps = onRequest({ cors: true }, async (request, response) => {
+    try {
+        const collectionId = request.query.collectionId;
+        const authHeader = `Basic ${Buffer.from(`${shopifyApiKey}:${shopifyPassword}`).toString("base64")}`;
+        const url = `https://${shopifyShopName}/admin/api/${apiVersion}/collections/${collectionId}/products.json`;
+        const fData: any = [];
+
+        await fetch(url, {
+            headers: {
+                Authorization: authHeader,
+            },
+        }).then(async (result: any) => {
+            const prods = await result.json();
+            for (let i = 0; i < prods["products"].length; i++) {
+                const id = prods["products"][i].id;
+                fData.push({
+                    "id": id,
+                    "product": prods["products"][i],
+                });
+            }
+        });
+        response.status(200).send(fData);
+    } catch (error) {
+        response.status(400).send("Error!");
+    }
+});
+
+export const orderCreationWebhook = onRequest(async (request, response) => {
+    // Maybe the Webhook will run it self several times ...
+    const oldOrders = await admin.firestore().collection("orders").where("shopify_order_id", "==", request.body.id).get();
+    if (oldOrders.empty) {
+        const authHeader = `Basic ${Buffer.from(`${shopifyApiKey}:${shopifyPassword}`).toString("base64")}`;
+        const url = `https://${shopifyShopName}/admin/api/${apiVersion}/products/${request.body.line_items[0].product_id}.json`;
+        await fetch(url, {
+            headers: {
+                Authorization: authHeader,
+            },
+        }).then(async (result: any) => {
+            const product = await result.json();
+            await admin.firestore().collection("orders").doc().set({
+                shopify_order_id: request.body.id,
+                shopify_json_body: JSON.stringify(request.body),
+                shopify_customer_id: request.body.customer.id,
+                first_order_product: JSON.stringify(product),
+            });
+        });
+        response.status(200).send("DONE");
+    } else {
+        response.status(200).send("ADDED BEFORE!");
     }
 });
