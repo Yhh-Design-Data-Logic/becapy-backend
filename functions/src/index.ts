@@ -4,16 +4,21 @@ import * as admin from "firebase-admin";
 export {
     shopifyProducts, getProductById, getProductsByCollectionId,
     getCustomCollections, getProductsByCollectionIdHttps, orderCreationWebhook,
+    addCart,
 } from "./shopify_apis";
 
 export {
     sendOTP, registerNormalUser, verifyAccount, updateUserDoc,
     registerWithFirebase, getUserById, resendOTP,
     triggerWhenUserDeleted, subscribeWithSystem,
-    getUserOrders,
+    getUserOrders, getQRCodesInPatch, getPatches,
 } from "./user/user";
 
-export { claimQRCode, getUserQrCodes } from "./qr_codes/qr";
+export {
+    claimQRCode, getUserQrCodes,
+    createBulkQRCode, createQRCodeRelatedToBulk,
+    triggerOnDeleteBulk,
+} from "./qr_codes/qr";
 
 export { createWifiQRCode, updateWifiQRCode } from "./qr_codes/wifi";
 export { createEmailQRCode, updateEmailQRCode } from "./qr_codes/email";
@@ -23,6 +28,9 @@ export { createURLQRCode, updateURLQRCode } from "./qr_codes/url";
 export { createWhatsappQRCode, updateWhatsappQRCode } from "./qr_codes/whatsapp";
 
 export { checkPasswordOTP, updatePassword, sendPasswordOTP } from "./user/forget_password";
+
+export { graphiQLAPI } from "./graphiql";
+
 
 admin.initializeApp();
 

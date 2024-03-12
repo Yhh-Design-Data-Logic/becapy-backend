@@ -15,7 +15,7 @@ export const createEmailQRCode = onCall(async (data) => {
         await admin
             .firestore()
             .collection("qr_codes").add({
-                routing_url: `mailto: ${email}?subject=${subject}&body=${body}`,
+                routing_url: `mailto:${email}?subject=${subject}%26body=${body}`,
                 is_static: is_static,
                 password: "", // QR Password "No Need"
                 corporate_id: corporate_id,
@@ -34,7 +34,7 @@ export const createEmailQRCode = onCall(async (data) => {
         };
     }
     return {
-        routing_url: `mailto: ${email}?subject=${subject}&body=${body}`,
+        routing_url: `mailto:${email}?subject=${subject}%26body=${body}`,
         "id": createdId, "message": "Created Successfully", "is_static": is_static,
         "password": "", // QR Password "No Need"
         "corporate_id": corporate_id,
@@ -52,8 +52,8 @@ export const updateEmailQRCode = onCall(async (data) => {
     const corporate_id = data.data.corporate_id;
     const uid = data.data.uid;
     const email = data.data.email;
-    const subject = data.data.email;
-    const body = data.data.email;
+    const subject = data.data.subject;
+    const body = data.data.body;
     const idForUpdate = data.data.idForUpdate;
 
     var createdId = "none";
@@ -62,7 +62,7 @@ export const updateEmailQRCode = onCall(async (data) => {
             .firestore()
             .collection("qr_codes").doc(idForUpdate)
             .update({
-                routing_url: `mailto: ${email}?subject=${subject}&body=${body}`,
+                routing_url: `mailto:${email}?subject=${subject}%26body=${body}`,
                 is_static: is_static,
                 password: "", // QR Password "No Need"
                 corporate_id: corporate_id,
@@ -78,7 +78,7 @@ export const updateEmailQRCode = onCall(async (data) => {
         };
     }
     return {
-        routing_url: `mailto: ${email}?subject=${subject}&body=${body}`,
+        routing_url: `mailto:${email}?subject=${subject}%26body=${body}`,
         "id": createdId, "message": "Updated Successfully", "is_static": is_static,
         "password": "", // QR Password "No Need"
         "corporate_id": corporate_id,

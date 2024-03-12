@@ -1,6 +1,8 @@
 /* eslint-disable max-len */
 import { onCall } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
+// import * as functions from "firebase-functions";
+import { onDocumentDeleted } from "firebase-functions/v2/firestore";
 
 export const claimQRCode = onCall(async (request) => {
     var serial = request.data.serial;
@@ -14,7 +16,9 @@ export const claimQRCode = onCall(async (request) => {
             if (doc.exists && (doc.data()["uid"] === "" || doc.data()["uid"] === null)) {
                 if (doc.data()["password"] == password) {
                     await admin.firestore().collection("qr_codes").doc(serial)
-                        .update({ "uid": userId });
+                        .update({
+                            "uid": userId, "claimed_timestamp": Date.now(),
+                        });
                     message = "Congratulations";
                     return "Congratulations!";
                 } else {
@@ -82,7 +86,7 @@ const getQRCodeMobileComponent = (doc: any, counter: number) => {
     return `
 <div class="qrcodecard"><div class="myqrserial-2">${counter}.</div>
 <div class="myqrinnercard-2"><div class="myqrcardtop">
-<div class="myqrtopleft"><img src=${chartURL} loading="lazy" alt="" class="image-100"><div class="toolsdiv mobiletoolsdiv"></div>
+<div class="myqrtopleft"><img src=${chartURL} loading="lazy" alt="" class="image-100" id="img_${serial}"><div class="toolsdiv mobiletoolsdiv"></div>
 <div class="settingsbtn" id="settingsbtn${serial}"><div class="text-block-52">Reprogram</div></div></div><div class="myqrtopright"><div class="griditemspecheader mobileviewgridheaderfont">Serial</div><div class="griditemspecdiv">
 <div id="grid-item-type-id" class="griditemspecvalue mobileviewserial">${serial}</div></div><div class="griditemspecheader mobileviewgridheaderfont">QR Type</div><div class="griditemspecdiv topmargin">
 <div id="grid-item-type-id" class="griditemspecvalue mobileviewserial">${type}</div></div><div class="griditemspecheader mobileviewgridheaderfont">QR Code Type</div>
@@ -108,3 +112,50 @@ const getQRCodeMobileComponent = (doc: any, counter: number) => {
     //    <div class="myqrbtmbtns"><a id="type-id${serial}" href="#" class="myqrbtn1 w-button">${qrCodeType}</a><a id="reprogram-id${serial}" href="#" class="myqrbtn2 w-button">Reprogram</a></div></div>
     //    <div class="div-block-98 myqrbtmright"><div id="switch-id" class="text-block-41 myqrtoggle">Offline</div></div></div></div></div>`;
 }
+
+export const createBulkQRCode = onCall(async (request) => {
+    const uid = request.data.uid;
+    let id = "";
+    await admin.firestore().collection("users").doc(uid).get().then(async (user: any) => {
+        if (user.data()["is_admin"] === true) {
+            await admin.firestore().collection("bulk_qr_codes").add({
+                "count": request.data.count,
+                "title": request.data.title,
+                "timestamp": Date.now(),
+            }).then(async (doc) => {
+                id = doc.id;
+            });
+        }
+    });
+    return id;
+});
+
+export const createQRCodeRelatedToBulk = onCall(async (requet) => {
+    const bulkId = requet.data.bulk_id;
+    let docId = "";
+    await admin.firestore().collection("qr_codes").add({
+        "is_static": requet.data.is_static,
+        "password": requet.data.password,
+        "qr_code_url": "https://qrcode.yhh.ae/redirect?id=",
+        "routing_url": "https://becapy-new.webflow.io/",
+        "timestamp": Date.now(),
+        "bulk_id": bulkId,
+    }).then(async (doc: any) => {
+        await admin.firestore().collection("qr_codes").doc(doc.id).update({
+            "qr_code_url": "https://qrcode.yhh.ae/redirect?id=" + doc.id,
+            "routing_url": "https://becapy-new.webflow.io/",
+        });
+        docId = doc.id;
+    });
+    return docId;
+});
+
+// For deleting the qr codes under the bulk when it's deleted!.
+export const triggerOnDeleteBulk = onDocumentDeleted("bulk_qr_codes/{bulkId}", async (event) => {
+    console.log("bulkId = " + event.params.bulkId);
+    await admin.firestore().collection("qr_codes").where("bulk_id", "==", event.params.bulkId).get().then(function (querySnapshot) {
+        querySnapshot.forEach((doc) => {
+            doc.ref.delete();
+        });
+    });
+});

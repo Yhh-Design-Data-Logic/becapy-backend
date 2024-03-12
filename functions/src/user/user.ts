@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable max-len */
 import { onCall, onRequest } from "firebase-functions/v2/https";
 import { sendOTPEmail, makeCode, sendSubscribeCode } from "../mailer";
@@ -332,7 +333,6 @@ export const getUserOrders = onCall(async (request) => {
                 querySnapshot.forEach((doc) => {
                     const order = JSON.parse(doc.data()["shopify_json_body"]);
                     const product = JSON.parse(doc.data()["first_order_product"]);
-                    console.log("iddd = " + doc.data()["shopify_order_id"]);
 
                     fData.push({
                         "id": doc.data()["shopify_order_id"],
@@ -369,3 +369,65 @@ export const getUserOrders = onCall(async (request) => {
     console.log("DONE");
     return fData;
 });
+export const getPatches = onCall(async (request) => {
+    const uid = request.data.uid;
+    const fData: any = [];
+
+    await admin.firestore().collection("users").doc(uid).get().then(async (user: any) => {
+        if (user.data()["is_admin"] === true) {
+            await admin.firestore().collection("bulk_qr_codes").get()
+                .then((result: any) => {
+                    result.forEach((doc: any) => {
+                        fData.push({
+                            "id": doc.id,
+                            "count": doc.data()["count"],
+                            "title": doc.data()["title"],
+                            "image": doc.data()["image"],
+                        });
+                    });
+                });
+        }
+    });
+    return fData;
+});
+
+export const getQRCodesInPatch = onCall(async (request) => {
+    const patchId = request.data.patchId;
+    const fData: any = [];
+    let counter = 0;
+
+    await admin.firestore().collection("qr_codes").where("bulk_id", "==", patchId).get()
+        .then(async (querySnapshot: any) => {
+            querySnapshot.forEach((doc: any) => {
+                counter = counter + 1;
+                fData.push({ "code": doc.data(), "component": getQRCodeMobileComponent(doc, counter) });
+                console.log(doc.id, " => ", doc.data());
+            });
+        });
+    return fData;
+});
+
+const getQRCodeMobileComponent = (doc: any, counter: number) => {
+    var type = doc.data()["is_static"] ? "Static" : "Dynamic";
+    var routing_url = doc.data()["routing_url"];
+    var serial = doc.id;
+    var chartURL = "https://chart.googleapis.com/chart?cht=qr&amp;choe=UTF-8&amp;chs=300x300&amp;chl=" + routing_url;
+    var qrCodeType = doc.data()["type"] ?? "-";
+    var UIDEmail = doc.data()["uid_email"] ?? "-";
+    const date = doc.data().claimed_timestamp ? new Date(doc.data()["claimed_timestamp"]) : "-";
+    const expiry = date === "-" ? "-" : date.getFullYear() + "/" + date.getMonth() + "/" + date.getDate();
+
+    return `
+<div class="qrcodecard"><div class="myqrserial-2">${counter}.</div>
+<div class="myqrinnercard-2"><div class="myqrcardtop">
+<div class="myqrtopleft"><img src=${chartURL} loading="lazy" alt="" class="image-100"><div class="toolsdiv mobiletoolsdiv"></div>
+<div class="settingsbtn" id="settingsbtn${serial}"><div class="text-block-52">${UIDEmail === "-" ? "Reprogram" : "Renew"}</div></div></div><div class="myqrtopright"><div class="griditemspecheader mobileviewgridheaderfont">Serial</div><div class="griditemspecdiv">
+<div id="grid-item-type-id" class="griditemspecvalue mobileviewserial">${serial}</div></div><div class="griditemspecheader mobileviewgridheaderfont">QR Type</div><div class="griditemspecdiv topmargin">
+<div id="grid-item-type-id" class="griditemspecvalue mobileviewserial">${type}</div></div><div class="griditemspecheader mobileviewgridheaderfont">QR Code Type</div>
+<div class="griditemspecdiv topmargin"><div id="type-id${serial}" class="griditemspecvalue mobileviewserial">${qrCodeType}</div></div>
+<p style="font-size: 10px; margin: 0px; padding: 0px">${UIDEmail === "-" ? "-" : ("Owner: " + UIDEmail)}</p>
+<p style="font-size: 10px; margin: 0px; padding: 0px">${expiry === "-" ? "-" : ("Expiry: " + expiry)}</p>
+
+</div></div></div></div>
+`;
+};

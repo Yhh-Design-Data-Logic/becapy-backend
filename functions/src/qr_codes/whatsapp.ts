@@ -8,19 +8,20 @@ export const createWhatsappQRCode = onCall(async (data) => {
     const uid = data.data.uid;
     const number = data.data.number;
     const message = data.data.message;
+    var replacedMessage = message.replace(/ /g, '%2B');
 
     var createdId = "none";
     try {
         await admin
             .firestore()
             .collection("qr_codes").add({
-                routing_url: `whatsapp://send?phone=${number}&text=${message}`,
+                routing_url: `https%3A%2F%2Fwa.me%2F${number}%3Ftext%3D${replacedMessage}`,
                 is_static: is_static,
                 password: "", // QR Password "No Need"
                 corporate_id: corporate_id,
                 type: "whatsapp",
                 number: number,
-                message: message,
+                message: replacedMessage,
                 uid: uid,
             }).then(async (result) => {
                 createdId = result.id;
@@ -33,13 +34,13 @@ export const createWhatsappQRCode = onCall(async (data) => {
     }
     return {
         id: createdId,
-        routing_url: `whatsapp://send?phone=${number}&text=${message}`,
+        routing_url: `https%3A%2F%2Fwa.me%2F${number}%3Ftext%3D${replacedMessage}`,
         is_static: is_static,
         password: "", // QR Password "No Need"
         corporate_id: corporate_id,
         type: "whatsapp",
         number: number,
-        message: message,
+        message: replacedMessage,
         uid: uid,
     };
 });
@@ -50,20 +51,21 @@ export const updateWhatsappQRCode = onCall(async (data) => {
     const corporate_id = data.data.corporate_id;
     const uid = data.data.uid;
     const number = data.data.number;
-    const message = data.data.message;
+    const message = data.data.message ?? "";
     const idForUpdate = data.data.idForUpdate;
+    var replacedMessage = message.replace(/ /g, '%2B');
 
     try {
         await admin
             .firestore()
             .collection("qr_codes").doc(idForUpdate).update({
-                routing_url: `whatsapp://send?phone=${number}&text=${message}`,
+                routing_url: `https%3A%2F%2Fwa.me%2F${number}%3Ftext%3D${replacedMessage}`,
                 is_static: is_static,
                 password: "", // QR Password "No Need"
                 corporate_id: corporate_id,
-                type: "whatsapp",
+                type: "Whatsapp",
                 number: number,
-                message: message,
+                message: replacedMessage,
                 uid: uid,
             });
     } catch (e) {
@@ -73,13 +75,13 @@ export const updateWhatsappQRCode = onCall(async (data) => {
     }
 
     return {
-        routing_url: `whatsapp://send?phone=${number}&text=${message}`,
+        routing_url: `whatsapp%3A%2F%2Fsend%3Fphone%3D${number}%26text%3D${replacedMessage}`,
         is_static: is_static,
         password: "", // QR Password "No Need"
         corporate_id: corporate_id,
-        type: "whatsapp",
+        type: "Whatsapp",
         number: number,
-        message: message,
+        message: replacedMessage,
         uid: uid,
     };
 });

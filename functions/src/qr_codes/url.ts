@@ -63,7 +63,7 @@ export const updateURLQRCode = onCall(async (data) => {
                 is_static: is_static,
                 password: "", // QR Password "No Need"
                 corporate_id: corporate_id,
-                type: "Wifi",
+                type: "URL",
                 url: url,
                 uid: uid,
                 idForUpdate: idForUpdate

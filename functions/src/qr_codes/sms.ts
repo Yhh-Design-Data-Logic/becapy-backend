@@ -14,7 +14,7 @@ export const createSMSQRCode = onCall(async (data) => {
         await admin
             .firestore()
             .collection("qr_codes").add({
-                routing_url: `SMSTO:${number}:${message}`,
+                routing_url: `SMSTO%3A${number}%3A${message}`,
                 is_static: is_static,
                 password: "", // QR Password "No Need"
                 corporate_id: corporate_id,
@@ -33,7 +33,7 @@ export const createSMSQRCode = onCall(async (data) => {
     }
     return {
         id: createdId,
-        routing_url: `SMSTO:${number}:${message}`,
+        routing_url: `SMSTO%3A${number}%3A${message}`,
         is_static: is_static,
         password: "", // QR Password "No Need"
         corporate_id: corporate_id,
@@ -72,7 +72,7 @@ export const updateSMSQRCode = onCall(async (data) => {
         };
     }
     return {
-        routing_url: `SMSTO:${number}:${message}`,
+        routing_url: `SMSTO%3A${number}%3A${message}`,
         is_static: is_static,
         password: "", // QR Password "No Need"
         corporate_id: corporate_id,
