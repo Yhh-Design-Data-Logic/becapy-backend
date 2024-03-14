@@ -12,12 +12,14 @@ export {
     registerWithFirebase, getUserById, resendOTP,
     triggerWhenUserDeleted, subscribeWithSystem,
     getUserOrders, getQRCodesInPatch, getPatches,
+    getFullStatistics,
 } from "./user/user";
 
 export {
     claimQRCode, getUserQrCodes,
     createBulkQRCode, createQRCodeRelatedToBulk,
-    triggerOnDeleteBulk,
+    triggerOnDeleteBulk, getBatchById,
+    getBatchAnalyticsById,
 } from "./qr_codes/qr";
 
 export { createWifiQRCode, updateWifiQRCode } from "./qr_codes/wifi";

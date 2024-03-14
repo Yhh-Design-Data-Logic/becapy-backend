@@ -6,6 +6,7 @@ import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 // import * as auth from "firebase-auth";
 import "../index";
+import { getDifferenceDays } from "../qr_codes/qr";
 
 // const shopifyApiKey = "d331707162e8c5ec410ff2138e427c2e";
 // const shopifyPassword = "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";
@@ -383,6 +384,7 @@ export const getPatches = onCall(async (request) => {
                             "count": doc.data()["count"],
                             "title": doc.data()["title"],
                             "image": doc.data()["image"],
+                            "timestamp": doc.data()["timestamp"],
                         });
                     });
                 });
@@ -400,34 +402,150 @@ export const getQRCodesInPatch = onCall(async (request) => {
         .then(async (querySnapshot: any) => {
             querySnapshot.forEach((doc: any) => {
                 counter = counter + 1;
-                fData.push({ "code": doc.data(), "component": getQRCodeMobileComponent(doc, counter) });
+                fData.push({
+                    "code": doc.data(), "component": getQRCodeMobileComponent(doc, counter),
+                    "componentList": getListComponent(doc, counter)
+                });
                 console.log(doc.id, " => ", doc.data());
             });
         });
     return fData;
 });
 
-const getQRCodeMobileComponent = (doc: any, counter: number) => {
-    var type = doc.data()["is_static"] ? "Static" : "Dynamic";
+const getListComponent = (doc: any, counter: number) => {
     var routing_url = doc.data()["routing_url"];
+    var password = doc.data()["password"];
     var serial = doc.id;
     var chartURL = "https://chart.googleapis.com/chart?cht=qr&amp;choe=UTF-8&amp;chs=300x300&amp;chl=" + routing_url;
-    var qrCodeType = doc.data()["type"] ?? "-";
-    var UIDEmail = doc.data()["uid_email"] ?? "-";
-    const date = doc.data().claimed_timestamp ? new Date(doc.data()["claimed_timestamp"]) : "-";
-    const expiry = date === "-" ? "-" : date.getFullYear() + "/" + date.getMonth() + "/" + date.getDate();
+    // const date = doc.data().claimed_timestamp ? new Date(doc.data()["claimed_timestamp"]) : "-";
+    // const expiry = date === "-" ? "-" : date.getFullYear() + "/" + date.getMonth() + "/" + date.getDate();
 
     return `
-<div class="qrcodecard"><div class="myqrserial-2">${counter}.</div>
-<div class="myqrinnercard-2"><div class="myqrcardtop">
-<div class="myqrtopleft"><img src=${chartURL} loading="lazy" alt="" class="image-100"><div class="toolsdiv mobiletoolsdiv"></div>
-<div class="settingsbtn" id="settingsbtn${serial}"><div class="text-block-52">${UIDEmail === "-" ? "Reprogram" : "Renew"}</div></div></div><div class="myqrtopright"><div class="griditemspecheader mobileviewgridheaderfont">Serial</div><div class="griditemspecdiv">
-<div id="grid-item-type-id" class="griditemspecvalue mobileviewserial">${serial}</div></div><div class="griditemspecheader mobileviewgridheaderfont">QR Type</div><div class="griditemspecdiv topmargin">
-<div id="grid-item-type-id" class="griditemspecvalue mobileviewserial">${type}</div></div><div class="griditemspecheader mobileviewgridheaderfont">QR Code Type</div>
-<div class="griditemspecdiv topmargin"><div id="type-id${serial}" class="griditemspecvalue mobileviewserial">${qrCodeType}</div></div>
-<p style="font-size: 10px; margin: 0px; padding: 0px">${UIDEmail === "-" ? "-" : ("Owner: " + UIDEmail)}</p>
-<p style="font-size: 10px; margin: 0px; padding: 0px">${expiry === "-" ? "-" : ("Expiry: " + expiry)}</p>
-
-</div></div></div></div>
+<div id="batch-list-id_${serial}" class="batchlistitem w-node-adfd39f2-57d6-4ea5-20b2-24ccce5b518c-ce5b518c">
+    <div class="text-block-103 font">${counter}.</div><img
+        src=${chartURL}
+        loading="lazy" alt="" class="image-131">
+    <div class="text-block-104 font">${serial}</div>
+    <div class="text-block-105 font">${password}</div>
+</div>
 `;
 };
+
+const getQRCodeMobileComponent = (doc: any, counter: number) => {
+    var routing_url = doc.data()["routing_url"];
+    var password = doc.data()["password"];
+    var serial = doc.id;
+    var chartURL = "https://chart.googleapis.com/chart?cht=qr&amp;choe=UTF-8&amp;chs=300x300&amp;chl=" + routing_url;
+    // const date = doc.data().claimed_timestamp ? new Date(doc.data()["claimed_timestamp"]) : "-";
+    // const expiry = date === "-" ? "-" : date.getFullYear() + "/" + date.getMonth() + "/" + date.getDate();
+
+    return `
+<div id="batch-qr-code-id" class="qrcodecard w-node-_3ba5b572-504a-e6a7-cdc1-a2750f4ce64c-0f4ce64c">
+    <div class="text-block-102">${counter}.</div><img
+        src=${chartURL}
+        loading="lazy" alt="" class="image-130">
+    <div class="batchdetailsdiv">
+        <div class="text-block-100">Serial: <span class="text-span-2">${serial}</span></div>
+        <div class="text-block-100">Pass Code: <span class="text-span-3">${password}</span></div>
+    </div>
+</div>
+`;
+};
+
+
+export const getFullStatistics = onCall(async (request) => {
+    var inventory = 0;
+    var soldItems = 0;
+    var expirySoonItems = 0;
+    var expiredItems = 0;
+    var notActivatedItems = 0;
+    var activatedItems = 0;
+
+    return await admin.firestore().collection("users").doc(request.data.uid).get().then(async (user: any) => {
+        if (user.data()["is_admin"] === true) {
+            return await admin.firestore().collection("bulk_qr_codes").get()
+                .then(async (result: any) => {
+                    // await result.forEach(async (doc: any) => {
+                    //     console.log("doc.id = " + doc.id);
+                    //     const batchStatistics = await getBatchAnalyticsById(doc.id);
+                    //     console.log("batchStatistics = " + batchStatistics);
+                    //     console.log("batchStatistics.inventory = " + batchStatistics.inventory);
+                    //     console.log("inventory = " + inventory);
+                    //     inventory += batchStatistics.inventory;
+                    //     soldItems += batchStatistics.sold;
+                    //     expirySoonItems += batchStatistics.expirySoon;
+                    //     expiredItems += batchStatistics.expired;
+                    //     notActivatedItems += batchStatistics.notActivated;
+                    //     activatedItems += batchStatistics.activated;
+                    // });
+                    console.log("result.docs = " + result.docs.length);
+                    for (let i = 0; i < result.docs.length; i++) {
+                        console.log("doc.id = " + result.docs[i].id);
+                        const batchStatistics = await getBatchAnalyticsById(result.docs[i].id);
+                        console.log("batchStatistics.inventory = " + batchStatistics.inventory);
+                        inventory += batchStatistics.inventory;
+                        soldItems += batchStatistics.sold;
+                        expirySoonItems += batchStatistics.expirySoon;
+                        expiredItems += batchStatistics.expired;
+                        notActivatedItems += batchStatistics.notActivated;
+                        activatedItems += batchStatistics.activated;
+                    }
+                    return {
+                        "inventory": inventory,
+                        "sold": soldItems,
+                        "expirySoon": expirySoonItems,
+                        "expired": expiredItems,
+                        "notActivated": notActivatedItems,
+                        "activated": activatedItems,
+                    };
+                });
+        }
+        return {
+            "message": "Not Admin!",
+        };
+    });
+});
+
+export const getBatchAnalyticsById = async (batchId: string) => {
+    let soldItems = 0;
+    let expirySoonItems = 0;
+    let expiredItems = 0;
+    let notActivatedItems = 0;
+    let activatedItems = 0;
+
+    return await admin.firestore().collection("qr_codes")
+        .where("bulk_id", "==", batchId).get().then((result: any) => {
+            for (let i = 0; i < result.docs.length; i++) {
+                const data = result.docs[i].data();
+                if (result.docs[i].data()["uid_email"]) {
+                    soldItems += 1;
+                }
+                if (data["uid_email"] && data["claimed_timestamp"]) {
+                    activatedItems += 1;
+                }
+                if (data["uid_email"] && !data["claimed_timestamp"]) {
+                    notActivatedItems += 1;
+                }
+                if (data["uid_email"]
+                    && data["claimed_timestamp"]
+                    && (getDifferenceDays(data["claimed_timestamp"]) < 90)) {
+                    console.log("sdsdsd = " + getDifferenceDays(data["claimed_timestamp"]));
+                    expirySoonItems += 1;
+                }
+                if (data["uid_email"]
+                    && data["claimed_timestamp"]
+                    && (getDifferenceDays(data["claimed_timestamp"]) < 0)) {
+                    expiredItems += 1;
+                }
+            }
+            return {
+                "inventory": (result.docs.length - soldItems),
+                "sold": soldItems,
+                "expirySoon": expirySoonItems,
+                "expired": expiredItems,
+                "notActivated": notActivatedItems,
+                "activated": activatedItems,
+            };
+        });
+};
+
