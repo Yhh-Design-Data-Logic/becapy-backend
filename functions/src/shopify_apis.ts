@@ -28,11 +28,11 @@ import { sendQRCodeCreds } from "./mailer";
 //     }
 // });
 
-// const shopifyApiKey = "d331707162e8c5ec410ff2138e427c2e";
-// const shopifyPassword = "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";
+const shopifyApiKey = "d331707162e8c5ec410ff2138e427c2e";
+const shopifyPassword = "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";
 
-const shopifyApiKey = "c0c79b8a5ab85c3588827e799cb7594c";
-const shopifyPassword = "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";
+// const shopifyApiKey = "c0c79b8a5ab85c3588827e799cb7594c";
+// const shopifyPassword = "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";
 
 const shopifyShopName = "209c5e-2.myshopify.com";
 const apiVersion = "2023-10";
@@ -312,16 +312,20 @@ const assignQRCode = async (doc: any, quantityOfQRCodes: number) => {
         .get().then(async (result) => {
             console.log("HERE 07");
             if (quantityOfQRCodes > result.docs.length) {
+                console.log("result.docs.length = " + result.docs.length);
+                console.log("quantityOfQRCodes = " + quantityOfQRCodes);
+
                 console.log("HERE 08");
                 message = "Out of stock!";
             } else {
                 console.log("HERE 09");
-                for (let i = 0; i <= quantityOfQRCodes; i++) {
+                for (let i = 0; i < quantityOfQRCodes; i++) {
                     console.log("HERE 10 - I = " + i);
 
                     await admin.firestore().collection("qr_codes").doc(result.docs[i].id).update({
                         "uid": doc.id,
                         "uid_email": doc.data()["email"],
+                        "purchased_timestamp": Date.now(),
                     });
                     console.log("HERE 11 - I = " + i);
                     console.log(result.docs[i].id);

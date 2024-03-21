@@ -19,7 +19,7 @@ export {
     claimQRCode, getUserQrCodes,
     createBulkQRCode, createQRCodeRelatedToBulk,
     triggerOnDeleteBulk, getBatchById,
-    getBatchAnalyticsById,
+    getBatchAnalyticsById, getQRCodeById,
 } from "./qr_codes/qr";
 
 export { createWifiQRCode, updateWifiQRCode } from "./qr_codes/wifi";
@@ -33,6 +33,10 @@ export { checkPasswordOTP, updatePassword, sendPasswordOTP } from "./user/forget
 
 export { graphiQLAPI } from "./graphiql";
 
+export {
+    downloadQRCode, downloadWholeQRCode,
+    zipTheBatch, generateQRCode,
+} from "./file_manager/file_manager";
 
 admin.initializeApp();
 

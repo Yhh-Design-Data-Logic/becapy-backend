@@ -3,6 +3,7 @@ import { onCall } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 // import * as functions from "firebase-functions";
 import { onDocumentDeleted } from "firebase-functions/v2/firestore";
+import { getCustomDateShape } from "../utils/custom_date_formatter";
 
 export const claimQRCode = onCall(async (request) => {
     var serial = request.data.serial;
@@ -13,11 +14,12 @@ export const claimQRCode = onCall(async (request) => {
 
     try {
         await admin.firestore().collection("qr_codes").doc(serial).get().then(async (doc: any) => {
-            if (doc.exists && (doc.data()["uid"] === "" || doc.data()["uid"] === null)) {
-                if (doc.data()["password"] == password) {
+            if (doc.exists && doc.data()["uid"] === userId) {
+                if (doc.data()["password"] === password) {
                     await admin.firestore().collection("qr_codes").doc(serial)
                         .update({
-                            "uid": userId, "claimed_timestamp": Date.now(),
+                            "uid": userId,
+                            "claimed_timestamp": Date.now(),
                         });
                     message = "Congratulations";
                     return "Congratulations!";
@@ -51,7 +53,7 @@ export const getUserQrCodes = onCall(async (request) => {
                 myCreatedQRCodes.push({
                     "component": component,
                     "serial": doc.id,
-                    "type": doc.data()["type"]
+                    "type": doc.data()["type"],
                 });
                 console.log(doc.id, " => ", doc.data());
             });
@@ -65,7 +67,9 @@ export const getUserQrCodes = onCall(async (request) => {
                 myCreatedQRCodesByBulk.push({
                     "component": component,
                     "serial": doc.id,
-                    "type": doc.data()["type"]
+                    "type": doc.data()["type"],
+                    "claimed_timestamp": doc.data()["claimed_timestamp"],
+                    "purchased_timestamp": doc.data()["purchased_timestamp"],
                 });
                 console.log(doc.id, " => ", doc.data());
             });
@@ -74,44 +78,97 @@ export const getUserQrCodes = onCall(async (request) => {
 });
 
 const getQRCodeMobileComponent = (doc: any, counter: number) => {
-    var type = doc.data()["is_static"] ? "Static" : "Dynamic";
-    var routing_url = doc.data()["routing_url"];
-    var serial = doc.id;
-    // var password = doc.data()["password"];
-    // const date = new Date(doc.data()["timestamp"]);
-    var chartURL = "https://chart.googleapis.com/chart?cht=qr&amp;choe=UTF-8&amp;chs=300x300&amp;chl=" + routing_url;
-    // var creation = date.getFullYear() + "/" + date.getMonth() + "/" + date.getDate();
-    // var expiry = date.getFullYear() + "/" + date.getMonth() + "/" + date.getDate();
-    var qrCodeType = doc.data()["type"] ?? "-";
+    // var type = doc.data()["is_static"] ? "Static" : "Dynamic";
+    const routingUrl = doc.data()["routing_url"];
+    const serial = doc.id;
+    const purchasedDate = new Date(doc.data()["purchased_timestamp"]);
+    const claimedDate = new Date(doc.data()["claimed_timestamp"]);
+    const chartURL = "https://chart.googleapis.com/chart?cht=qr&amp;choe=UTF-8&amp;chs=300x300&amp;chl=" + routingUrl;
+    const qrCodeType = doc.data()["type"] ?? "-";
+    const expiryDate = new Date(`${purchasedDate.getFullYear() + 1}-${purchasedDate.getMonth()}-${purchasedDate.getDate()}`);
+
     return `
-<div class="qrcodecard"><div class="myqrserial-2">${counter}.</div>
-<div class="myqrinnercard-2"><div class="myqrcardtop">
-<div class="myqrtopleft"><img src=${chartURL} loading="lazy" alt="" class="image-100" id="img_${serial}"><div class="toolsdiv mobiletoolsdiv"></div>
-<div class="settingsbtn" id="settingsbtn${serial}"><div class="text-block-52">Reprogram</div></div></div><div class="myqrtopright"><div class="griditemspecheader mobileviewgridheaderfont">Serial</div><div class="griditemspecdiv">
-<div id="grid-item-type-id" class="griditemspecvalue mobileviewserial">${serial}</div></div><div class="griditemspecheader mobileviewgridheaderfont">QR Type</div><div class="griditemspecdiv topmargin">
-<div id="grid-item-type-id" class="griditemspecvalue mobileviewserial">${type}</div></div><div class="griditemspecheader mobileviewgridheaderfont">QR Code Type</div>
-<div class="griditemspecdiv topmargin"><div id="type-id${serial}" class="griditemspecvalue mobileviewserial">${qrCodeType}</div></div></div></div></div></div>
+<div id="card-id_${serial}" class="myqrcodediv w-node-dd614b2a-841a-967e-9641-4abacefde7f2-cefde7f2">
+    <div class="text-block-102 myqrcode">${counter}.</div>
+    <div class="div-block-156"><img
+            src=${chartURL}
+            loading="lazy" alt="" class="image-130" id="img_${serial}">
+        <div class="qrsettingsdiv">
+            <div id="status-circle-id" class="statusdiv" style="background-color:${getColorOnStatus(doc.data())}"></div>
+            <div class="div-block-157">
+                <div id="new-download-id_${serial}" class="settingdiv"><img
+                        src="https://assets-global.website-files.com/659d238ef90eb981ff6482dd/65f41157e2c98166eb802475_download_white.svg"
+                        loading="lazy" alt="" class="image-139"></div>
+                <div id="new-edit-id_${serial}" class="settingdiv bg-red-100"><img
+                        src="https://assets-global.website-files.com/659d238ef90eb981ff6482dd/65f411c3fcfa3b80fe10fe39_edit_white.svg"
+                        loading="lazy" alt="" class="image-139 edit"></div>
+            </div>
+            <div id="new-renew-id_${serial}" class="renewdiv"><img
+                    src="https://assets-global.website-files.com/659d238ef90eb981ff6482dd/65f412bd41ce2357f0fb7b17_carbon_renew.svg"
+                    loading="lazy" alt="" class="image-140">
+                <div class="text-block-113">Renew</div>
+            </div>
+        </div>
+    </div>
+    <div class="batchdetailsdiv">
+        <div class="text-block-100">Date: <span class="text-span-2">${getCustomDateShape(purchasedDate)}</span></div>
+        <div class="text-block-100">QR Code Type: <span id="type-id${serial}" class="text-span-2">${qrCodeType}</span></div>
+        <div class="text-block-100">QR Type: <span class="text-span-2">Dynamic</span></div>
+        <div class="text-block-100">Serial NO: <span class="text-span-2">${serial}</span></div>
+        <div class="text-block-100">Details: <span class="text-span-3">Scan 3412</span></div>
+        <div class="text-block-100">Activated: ${doc.data()["claimed_timestamp"] ? getCustomDateShape(claimedDate) : "-"}</div>
+        <div class="text-block-100">Expire: ${doc.data()["purchased_timestamp"] ? (getCustomDateShape(expiryDate)) : "-"}</div>
+    </div>
+    <div class="w-layout-grid grid-41"><a id="w-node-dd614b2a-841a-967e-9641-4abacefde819-cefde7f2" href="#"
+            class="btn-primary myqrcodeedit w-button">Edit</a><a
+            id="w-node-dd614b2a-841a-967e-9641-4abacefde81b-cefde7f2" href="#"
+            class="btn-primary myqrcodedownload w-button">Download</a><a
+            id="w-node-dd614b2a-841a-967e-9641-4abacefde81d-cefde7f2" href="#"
+            class="btn-primary myqrcoderenew w-button">Renew</a></div>
+    <div class="qrcodestatusdiv" style="background-color:${getColorOnStatus(doc.data())}">
+        <div id="status-text-id" class="text-block-114">${getQRStatus(doc.data())}</div>
+    </div>
+</div>
 `;
+
     //     return `
-    //    <div class="qrcodediv"><div class="myqrserial">${counter}.</div>
-    //    <div class="myqrinnercard"><div class="myqrcardtop">
-    //    <div class="myqrtopleft"><h1 class="heading-31 myqrtoplhead">${password}</h1>
-    //    <img src=${chartURL} loading="lazy" alt=""><div class="toolsdiv mobiletoolsdiv">
-    //    <div id="download-id${serial}" class="tool mobiletool"><img src="https://assets-global.website-files.com/64ec3e20469d6a03a29bbb29/65153a6fbd56064332082848_download.svg" loading="lazy" alt="" class="toolimg mobiletoolimg"></div>
-    //    <div id="analytics-id${serial}" class="tool mobiletool"><img src="https://assets-global.website-files.com/64ec3e20469d6a03a29bbb29/65153aadc5d12ff4b9f71a46_carbon_analytics.svg" loading="lazy" alt="" class="toolimg mobiletoolimg"></div>
-    //    <div id="view-id${serial}" class="tool mobiletool"><img src="https://assets-global.website-files.com/64ec3e20469d6a03a29bbb29/65153ab76b64d09f3e1fa194_fa6-solid_eye.svg" loading="lazy" alt="" class="toolimg mobiletoolimg"></div>
-    //    <div id="key-id${serial}" class="tool mobiletool"><img src="https://assets-global.website-files.com/64ec3e20469d6a03a29bbb29/65153ac09b5557cebed7c6ec_key.svg" loading="lazy" width="13" alt="" class="toolimg mobiletoolimg"></div></div></div><div class="myqrtopright"><div class="griditemspecheader mobileviewgridheaderfont">Type</div><div class="griditemspecdiv">
-    //    <div id="grid-item-type-id" class="griditemspecvalue mobileviewserial">${type}</div></div>
-    //    <div class="griditemspecheader mobileviewgridheaderfont">Serial No</div><div class="griditemspecdiv">
-    //    <div id="grid-item-type-id" class="griditemspecvalue mobileviewserial">${serial}</div></div>
-    //    <div class="griditemspecheader mobileviewgridheaderfont">Creation Date</div><div class="griditemspecdiv">
-    //    <div id="grid-item-type-id" class="griditemspecvalue mobileviewserial">${creation}</div></div>
-    //    <div class="griditemspecheader mobileviewgridheaderfont">Expiry Date</div><div class="griditemspecdiv">
-    //    <div id="grid-item-type-id" class="griditemspecvalue mobileviewserial">${expiry}</div></div></div></div>
-    //    <div class="myqrcardbtm"><div class="div-block-97 myqrbtmleft"><div class="text-block-41">Program:</div>
-    //    <div class="myqrbtmbtns"><a id="type-id${serial}" href="#" class="myqrbtn1 w-button">${qrCodeType}</a><a id="reprogram-id${serial}" href="#" class="myqrbtn2 w-button">Reprogram</a></div></div>
-    //    <div class="div-block-98 myqrbtmright"><div id="switch-id" class="text-block-41 myqrtoggle">Offline</div></div></div></div></div>`;
-}
+    // <div class="qrcodecard"><div class="myqrserial-2">${counter}.</div>
+    // <div class="myqrinnercard-2"><div class="myqrcardtop">
+    // <div class="myqrtopleft"><img src=${chartURL} loading="lazy" alt="" class="image-100" id="img_${serial}"><div class="toolsdiv mobiletoolsdiv"></div>
+    // <div class="settingsbtn" id="settingsbtn${serial}"><div class="text-block-52">Reprogram</div></div></div><div class="myqrtopright"><div class="griditemspecheader mobileviewgridheaderfont">Serial</div><div class="griditemspecdiv">
+    // <div id="grid-item-type-id" class="griditemspecvalue mobileviewserial">${serial}</div></div><div class="griditemspecheader mobileviewgridheaderfont">QR Type</div><div class="griditemspecdiv topmargin">
+    // <div id="grid-item-type-id" class="griditemspecvalue mobileviewserial">${type}</div></div><div class="griditemspecheader mobileviewgridheaderfont">QR Code Type</div>
+    // <div class="griditemspecdiv topmargin"><div id="type-id${serial}" class="griditemspecvalue mobileviewserial">${qrCodeType}</div></div></div></div></div></div>
+    // `;
+};
+
+const getQRStatus = (data: any) => {
+    if (data["claimed_timestamp"] && getDifferenceDays(data["purchased_timestamp"]) > 30) {
+        return "Activated";
+    } else if (data["claimed_timestamp"] && getDifferenceDays(data["purchased_timestamp"]) < 30 && getDifferenceDays(data["purchased_timestamp"]) > 0) {
+        return `${getDifferenceDays(data["purchased_timestamp"])} day left`;
+    } else if (data["claimed_timestamp"] && getDifferenceDays(data["purchased_timestamp"]) < 0) {
+        return "Expired";
+    } else if (!data["claimed_timestamp"]) {
+        return "Not Activated";
+    } else {
+        return "NaN";
+    }
+};
+
+const getColorOnStatus = (data: any) => {
+    if (data["claimed_timestamp"] && getDifferenceDays(data["purchased_timestamp"]) > 30) {
+        return "#43A047";
+    } else if (data["claimed_timestamp"] && getDifferenceDays(data["purchased_timestamp"]) < 30 && getDifferenceDays(data["purchased_timestamp"]) > 0) {
+        return "#F88C29";
+    } else if (data["claimed_timestamp"] && getDifferenceDays(data["purchased_timestamp"]) < 0) {
+        return "#DA0101";
+    } else if (!data["claimed_timestamp"]) {
+        return "#ADADAD";
+    } else {
+        return "#FFFFFF";
+    }
+};
 
 export const createBulkQRCode = onCall(async (request) => {
     const uid = request.data.uid;
@@ -129,27 +186,41 @@ export const createBulkQRCode = onCall(async (request) => {
             });
         }
     });
-    return { "id": id, "image": rImage };
+    return id === "" ? "NOT ADMIN" : { "id": id, "image": rImage };
 });
 
-export const createQRCodeRelatedToBulk = onCall(async (requet) => {
-    const bulkId = requet.data.bulk_id;
-    let docId = "";
-    await admin.firestore().collection("qr_codes").add({
-        "is_static": requet.data.is_static,
-        "password": requet.data.password,
-        "qr_code_url": "https://qrcode.yhh.ae/redirect?id=",
-        "routing_url": "https://becapy-new.webflow.io/",
-        "timestamp": Date.now(),
-        "bulk_id": bulkId,
-    }).then(async (doc: any) => {
-        await admin.firestore().collection("qr_codes").doc(doc.id).update({
-            "qr_code_url": "https://qrcode.yhh.ae/redirect?id=" + doc.id,
-            "routing_url": "https://becapy-new.webflow.io/",
-        });
-        docId = doc.id;
+export const createQRCodeRelatedToBulk = onCall(async (request) => {
+    const bulkId = request.data.bulk_id;
+    const uid = request.data.uid;
+    const itemsCount = request.data.items_count;
+    const resData: string[] = [];
+    let errorMsg = "";
+    await admin.firestore().collection("users").doc(uid).get().then(async (user: any) => {
+        if (user.data()["is_admin"] === true) {
+            for (let i = 0; i < itemsCount; i++) {
+                await admin.firestore().collection("qr_codes").add({
+                    "is_static": false,
+                    "password": makePassword(6),
+                    "qr_code_url": "https://qrcode.yhh.ae/redirect?id=",
+                    "routing_url": "https://becapy-new.webflow.io/",
+                    "timestamp": Date.now(),
+                    "bulk_id": bulkId,
+                    "corporate_id": uid,
+                    "uid": "",
+                }).then(async (doc: any) => {
+                    await admin.firestore().collection("qr_codes").doc(doc.id).update({
+                        "qr_code_url": "https://qrcode.yhh.ae/redirect?id=" + doc.id,
+                        "routing_url": "https://becapy-new.webflow.io/",
+                    });
+                    resData.push(doc.id);
+                });
+            }
+        } else {
+            errorMsg = "NOT ADMIN";
+        }
     });
-    return docId;
+
+    return errorMsg === "" ? resData : errorMsg;
 });
 
 export const getBatchById = onCall(async (request) => {
@@ -191,7 +262,7 @@ export const getBatchAnalyticsById = onCall(async (request) => {
                 }
                 if (data["uid_email"]
                     && data["claimed_timestamp"]
-                    && (getDifferenceDays(data["claimed_timestamp"]) < 90)) {
+                    && (getDifferenceDays(data["claimed_timestamp"]) < 30)) {
                     console.log("sdsdsd = " + getDifferenceDays(data["claimed_timestamp"]));
                     expirySoonItems += 1;
                 }
@@ -213,7 +284,7 @@ export const getBatchAnalyticsById = onCall(async (request) => {
 });
 
 export const getDifferenceDays = (timestamp: number): number => {
-    const date1 = new Date(`${new Date(timestamp).getMonth()}/${new Date(timestamp).getDay()}/${new Date(timestamp).getFullYear() + 1}`);
+    const date1 = new Date(`${new Date(timestamp).getMonth()}/${new Date(timestamp).getDate()}/${new Date(timestamp).getFullYear() + 1}`);
     const date2 = new Date(Date.now());
     const DifferenceInTime = date1.getTime() - date2.getTime();
     console.log("DifferenceInTime = " + DifferenceInTime);
@@ -255,3 +326,39 @@ const getRandomImageURL = () => {
     const result: string = arr[ind];
     return result;
 };
+
+export const getQRCodeById = onCall(async (request) => {
+    const uid = request.data.uid;
+    const serialId = request.data.serial_id;
+    return await admin.firestore().collection("qr_codes").doc(serialId).get().then(async (doc: any) => {
+        if (doc.data()["uid"] === uid) {
+            const serial = doc.id;
+            const purchasedDate = new Date(doc.data()["purchased_timestamp"]);
+            const claimedDate = new Date(doc.data()["claimed_timestamp"]);
+            const expiryDate = new Date(`${purchasedDate.getFullYear() + 1}-${purchasedDate.getMonth()}-${purchasedDate.getDate()}`);
+
+            return {
+                "id": serial,
+                "date": doc.data()["purchased_timestamp"] ? (getCustomDateShape(purchasedDate)) : "-",
+                "activated": doc.data()["claimed_timestamp"] ? (getCustomDateShape(claimedDate)) : "-",
+                "type": doc.data()["type"],
+                "expiry": doc.data()["purchased_timestamp"] ? (getCustomDateShape(expiryDate)) : "-",
+            };
+        } else {
+            return "NOT THE OWNER!";
+        }
+    });
+});
+
+
+const makePassword = (length: number) => {
+    let result = "";
+    const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    const charactersLength = characters.length;
+    let counter = 0;
+    while (counter < length) {
+        result += characters.charAt(Math.floor(Math.random() * charactersLength));
+        counter += 1;
+    }
+    return result;
+}

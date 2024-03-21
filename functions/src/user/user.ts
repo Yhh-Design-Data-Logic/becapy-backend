@@ -8,11 +8,11 @@ import * as functions from "firebase-functions";
 import "../index";
 import { getDifferenceDays } from "../qr_codes/qr";
 
-// const shopifyApiKey = "d331707162e8c5ec410ff2138e427c2e";
-// const shopifyPassword = "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";
+const shopifyApiKey = "d331707162e8c5ec410ff2138e427c2e";
+const shopifyPassword = "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";
 
-const shopifyApiKey = "c0c79b8a5ab85c3588827e799cb7594c";
-const shopifyPassword = "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";
+// const shopifyApiKey = "c0c79b8a5ab85c3588827e799cb7594c";
+// const shopifyPassword = "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";
 
 const shopifyShopName = "209c5e-2.myshopify.com";
 const apiVersion = "2023-10";
@@ -91,8 +91,6 @@ const registerWithShopify = async (
     lastName: string,
     password: string
 ) => {
-    console.log("shopifyApiKey = " + shopifyApiKey);
-    console.log("shopifyPassword = " + shopifyPassword);
     const authHeader = `Basic ${Buffer.from(
         `${shopifyApiKey}:${shopifyPassword}`
     ).toString("base64")}`;
@@ -403,14 +401,37 @@ export const getQRCodesInPatch = onCall(async (request) => {
             querySnapshot.forEach((doc: any) => {
                 counter = counter + 1;
                 fData.push({
-                    "code": doc.data(), "component": getQRCodeMobileComponent(doc, counter),
-                    "componentList": getListComponent(doc, counter)
+                    "id": doc.id,
+                    "code": doc.data(),
+                    "component": getQRCodeMobileComponent(doc, counter),
+                    "componentList": getListComponent(doc, counter),
+                    "componentFolder": getFolderComponent(doc, counter),
                 });
                 console.log(doc.id, " => ", doc.data());
             });
         });
     return fData;
 });
+
+const getFolderComponent = (doc: any, counter: number) => {
+    var password = doc.data()["password"];
+    var serial = doc.id;
+
+    return `
+<div id="folder-id_${serial}" class="qrcodecard centerelements w-node-_0b2ff4f4-1502-24aa-f99b-0a7dbc19948b-bc19948b">
+    <div class="div-block-160"><img
+            src="https://assets-global.website-files.com/659d238ef90eb981ff6482dd/65f8b7b9112545cf9fb0f784_Vector.svg"
+            loading="lazy" alt="" class="image-130">
+        <div class="text-block-117">${counter}</div>
+    </div>
+    <div class="batchdetailsdiv _0-bottom">
+        <div class="text-block-100">Serial: <span class="text-span-2">${serial}</span></div>
+        <div class="text-block-100">Pass Code: <span class="text-span-3">${password}</span></div>
+    </div>
+</div>
+`;
+};
+
 
 const getListComponent = (doc: any, counter: number) => {
     var routing_url = doc.data()["routing_url"];
@@ -528,7 +549,7 @@ export const getBatchAnalyticsById = async (batchId: string) => {
                 }
                 if (data["uid_email"]
                     && data["claimed_timestamp"]
-                    && (getDifferenceDays(data["claimed_timestamp"]) < 90)) {
+                    && (getDifferenceDays(data["claimed_timestamp"]) < 30)) {
                     console.log("sdsdsd = " + getDifferenceDays(data["claimed_timestamp"]));
                     expirySoonItems += 1;
                 }
