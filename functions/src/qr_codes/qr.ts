@@ -88,11 +88,14 @@ const getQRCodeMobileComponent = (doc: any, counter: number) => {
     const expiryDate = new Date(`${purchasedDate.getFullYear() + 1}-${purchasedDate.getMonth()}-${purchasedDate.getDate()}`);
 
     return `
+
+
+
 <div id="card-id_${serial}" class="myqrcodediv w-node-dd614b2a-841a-967e-9641-4abacefde7f2-cefde7f2">
     <div class="text-block-102 myqrcode">${counter}.</div>
     <div class="div-block-156"><img
             src=${chartURL}
-            loading="lazy" alt="" class="image-130" id="img_${serial}">
+            loading="lazy" alt="" class="image-130">
         <div class="qrsettingsdiv">
             <div id="status-circle-id" class="statusdiv" style="background-color:${getColorOnStatus(doc.data())}"></div>
             <div class="div-block-157">
@@ -103,14 +106,25 @@ const getQRCodeMobileComponent = (doc: any, counter: number) => {
                         src="https://assets-global.website-files.com/659d238ef90eb981ff6482dd/65f411c3fcfa3b80fe10fe39_edit_white.svg"
                         loading="lazy" alt="" class="image-139 edit"></div>
             </div>
-            <div id="new-renew-id_${serial}" class="renewdiv"><img
+            <div class="div-block-157">
+                <div id="new-renew-id_${serial}" class="settingdiv renew"><img
+                        src="https://assets-global.website-files.com/659d238ef90eb981ff6482dd/65f412bd41ce2357f0fb7b17_carbon_renew.svg"
+                        loading="lazy" alt="" class="image-139"></div>
+                <div id="new-share-id_${serial}" class="settingdiv bg-red-100 share"><img
+                        src="https://assets-global.website-files.com/659d238ef90eb981ff6482dd/65fbfa5c260243154c1287cb_share.png"
+                        loading="lazy"
+                        sizes="(max-width: 767px) 15px, (max-width: 991px) 2vw, (max-width: 1279px) 15px, 1vw"
+                        srcset="https://assets-global.website-files.com/659d238ef90eb981ff6482dd/65fbfa5c260243154c1287cb_share-p-500.png 500w, https://assets-global.website-files.com/659d238ef90eb981ff6482dd/65fbfa5c260243154c1287cb_share.png 512w"
+                        alt="" class="image-139 edit"></div>
+            </div>
+            <div id="renew-id" class="renewdiv"><img
                     src="https://assets-global.website-files.com/659d238ef90eb981ff6482dd/65f412bd41ce2357f0fb7b17_carbon_renew.svg"
                     loading="lazy" alt="" class="image-140">
                 <div class="text-block-113">Renew</div>
             </div>
         </div>
     </div>
-    <div class="batchdetailsdiv">
+  <div class="batchdetailsdiv">
         <div class="text-block-100">Date: <span class="text-span-2">${getCustomDateShape(purchasedDate)}</span></div>
         <div class="text-block-100">QR Code Type: <span id="type-id${serial}" class="text-span-2">${qrCodeType}</span></div>
         <div class="text-block-100">QR Type: <span class="text-span-2">Dynamic</span></div>
@@ -125,10 +139,11 @@ const getQRCodeMobileComponent = (doc: any, counter: number) => {
             class="btn-primary myqrcodedownload w-button">Download</a><a
             id="w-node-dd614b2a-841a-967e-9641-4abacefde81d-cefde7f2" href="#"
             class="btn-primary myqrcoderenew w-button">Renew</a></div>
-    <div class="qrcodestatusdiv" style="background-color:${getColorOnStatus(doc.data())}">
+<div class="qrcodestatusdiv" style="background-color:${getColorOnStatus(doc.data())}">
         <div id="status-text-id" class="text-block-114">${getQRStatus(doc.data())}</div>
     </div>
 </div>
+
 `;
 
     //     return `

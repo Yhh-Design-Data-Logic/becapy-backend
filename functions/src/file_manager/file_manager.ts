@@ -82,23 +82,7 @@ export const downloadQRCode = onRequest(async (request, response) => {
                 `attachment; filename="${qrId}.svg"`
             );
         }
-        response.write(qrString);
-
-        response.set("Access-Control-Allow-Origin", "*");
-        response.setHeader("Content-Type", "file/txt");
-
-        response.setHeader(
-            "Content-Disposition",
-            `attachment; filename="${qrId}_password.txt"`
-        );
-        response.write(result.password);
-
-        response.end(qrString);
-        response.end(result.password);
-
         response.send(qrString);
-        response.send(result.password);
-
     } catch (err) {
         response.status(500).send("Failed to generate QR code");
     }

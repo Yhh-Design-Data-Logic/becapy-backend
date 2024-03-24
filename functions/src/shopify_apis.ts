@@ -54,7 +54,7 @@ export const shopifyProducts = onCall(async (request) => {
             result = prods;
             for (let i = 0; i < prods["products"].length; i++) {
                 const id = prods["products"][i].id;
-                if (String(id) != "6935766663235") { // for the QR Code product.
+                if (String(id) !== "6935766663235" && String(id) !== "7014744686659") { // for the QR Code product.
                     fData.push({
                         "id": id,
                         "product": prods["products"][i],
@@ -260,6 +260,11 @@ export const orderCreationWebhook = onRequest(async (request, response) => {
     // Maybe the Webhook will run it self several times ...
     let quantityOfQRCodes = 0;
     let isQRCode = false;
+
+    let isRenewQR = false;
+    let renewQRPlan = "";
+    let renewQRId = "";
+
     let messageOfAssigning = "";
 
     for (let i = 0; i < request.body.line_items.length; i++) {
@@ -267,8 +272,15 @@ export const orderCreationWebhook = onRequest(async (request, response) => {
             isQRCode = true;
             quantityOfQRCodes = request.body.line_items[i].quantity;
         }
+        if (request.body.line_items[i].product_id === 7014744686659) {
+            isRenewQR = true;
+            renewQRId = request.body.line_items[i].properties[0].value;
+            renewQRPlan = request.body.line_items[i].properties[1].value;
+        }
     }
     console.log("isQRCode = " + isQRCode);
+    console.log("isRenewQR = " + isRenewQR);
+
     console.log("quantityOfQRCodes = " + quantityOfQRCodes);
     const oldOrders = await admin.firestore().collection("orders").where("shopify_order_id", "==", request.body.id).get();
     if (oldOrders.empty) {
@@ -298,12 +310,59 @@ export const orderCreationWebhook = onRequest(async (request, response) => {
                         messageOfAssigning = await assignQRCode(result.docs[0], quantityOfQRCodes);
                     });
             }
+            if (isRenewQR) {
+                console.log("RENEW HERE 04");
+                console.log("renewQRId = " + renewQRId);
+                console.log("renewQRPlan = " + renewQRPlan);
+
+                await admin.firestore().collection("qr_codes").doc(renewQRId)
+                    .get().then(async (result: any) => {
+                        console.log("RENEW HERE 05");
+
+                        if (renewQRPlan === "6-months") {
+                            console.log("RENEW HERE 06");
+
+                            const timestamp = result.data()["purchased_timestamp"];
+                            await admin.firestore().collection("qr_codes").doc(renewQRId)
+                                .update({
+                                    "purchased_timestamp": +addMonths(new Date(timestamp), 6),
+                                });
+                        } else if (renewQRPlan === "1-year") {
+                            console.log("RENEW HERE 07");
+
+                            const timestamp = result.data()["purchased_timestamp"];
+                            // const newDate = new Date(`${new Date(timestamp).getMonth()}/${new Date(timestamp).getDate()}/${new Date(timestamp).getFullYear() + 1}`);
+                            await admin.firestore().collection("qr_codes").doc(renewQRId)
+                                .update({
+                                    "purchased_timestamp": +addMonths(new Date(timestamp), 12),
+                                });
+                        } else if (renewQRPlan === "life-time") {
+                            console.log("RENEW HERE 08");
+
+                            const timestamp = result.data()["purchased_timestamp"];
+                            await admin.firestore().collection("qr_codes").doc(renewQRId)
+                                .update({
+                                    "purchased_timestamp": +addMonths(new Date(timestamp), 1200),
+                                    "life_time_plan": true,
+                                });
+                        }
+                    });
+            }
         });
         response.status(200).send("DONE - " + messageOfAssigning);
     } else {
         response.status(200).send("ADDED BEFORE!");
     }
 });
+
+const addMonths = (date: Date, months: number) => {
+    const d = date.getDate();
+    date.setMonth(date.getMonth() + +months);
+    if (date.getDate() != d) {
+        date.setDate(0);
+    }
+    return date;
+};
 
 const assignQRCode = async (doc: any, quantityOfQRCodes: number) => {
     let message = "";
