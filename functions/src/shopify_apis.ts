@@ -331,7 +331,6 @@ export const orderCreationWebhook = onRequest(async (request, response) => {
                             console.log("RENEW HERE 07");
 
                             const timestamp = result.data()["purchased_timestamp"];
-                            // const newDate = new Date(`${new Date(timestamp).getMonth()}/${new Date(timestamp).getDate()}/${new Date(timestamp).getFullYear() + 1}`);
                             await admin.firestore().collection("qr_codes").doc(renewQRId)
                                 .update({
                                     "purchased_timestamp": +addMonths(new Date(timestamp), 12),
@@ -385,6 +384,7 @@ const assignQRCode = async (doc: any, quantityOfQRCodes: number) => {
                         "uid": doc.id,
                         "uid_email": doc.data()["email"],
                         "purchased_timestamp": Date.now(),
+                        "fixed_purchased_timestamp": Date.now(),
                     });
                     console.log("HERE 11 - I = " + i);
                     console.log(result.docs[i].id);

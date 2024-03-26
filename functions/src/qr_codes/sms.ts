@@ -47,7 +47,6 @@ export const createSMSQRCode = onCall(async (data) => {
 export const updateSMSQRCode = onCall(async (data) => {
     console.log("data = " + data);
     const is_static = data.data.is_static;
-    const corporate_id = data.data.corporate_id;
     const uid = data.data.uid;
     const number = data.data.number;
     const message = data.data.message;
@@ -60,7 +59,6 @@ export const updateSMSQRCode = onCall(async (data) => {
                 routing_url: `SMSTO:${number}:${message}`,
                 is_static: is_static,
                 password: "", // QR Password "No Need"
-                corporate_id: corporate_id,
                 type: "SMS",
                 number: number,
                 message: message,
@@ -75,7 +73,6 @@ export const updateSMSQRCode = onCall(async (data) => {
         routing_url: `SMSTO%3A${number}%3A${message}`,
         is_static: is_static,
         password: "", // QR Password "No Need"
-        corporate_id: corporate_id,
         type: "SMS",
         number: number,
         message: message,

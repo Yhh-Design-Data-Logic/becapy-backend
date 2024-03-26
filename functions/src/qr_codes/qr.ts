@@ -1,5 +1,5 @@
 /* eslint-disable max-len */
-import { onCall } from "firebase-functions/v2/https";
+import { onCall, onRequest } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 // import * as functions from "firebase-functions";
 import { onDocumentDeleted } from "firebase-functions/v2/firestore";
@@ -82,10 +82,11 @@ const getQRCodeMobileComponent = (doc: any, counter: number) => {
     const routingUrl = doc.data()["routing_url"];
     const serial = doc.id;
     const purchasedDate = new Date(doc.data()["purchased_timestamp"]);
+    const fixedPurchasedDate = doc.data()["fixed_purchased_timestamp"] ? new Date(doc.data()["fixed_purchased_timestamp"]) : "-";
     const claimedDate = new Date(doc.data()["claimed_timestamp"]);
     const chartURL = "https://chart.googleapis.com/chart?cht=qr&amp;choe=UTF-8&amp;chs=300x300&amp;chl=" + routingUrl;
     const qrCodeType = doc.data()["type"] ?? "-";
-    const expiryDate = new Date(`${purchasedDate.getFullYear() + 1}-${purchasedDate.getMonth()}-${purchasedDate.getDate()}`);
+    const expiryDate = new Date(`${purchasedDate.getFullYear() + 1}-${purchasedDate.getMonth() + 1}-${purchasedDate.getDate()}`);
 
     return `
 
@@ -107,9 +108,11 @@ const getQRCodeMobileComponent = (doc: any, counter: number) => {
                         loading="lazy" alt="" class="image-139 edit"></div>
             </div>
             <div class="div-block-157">
-                <div id="new-renew-id_${serial}" class="settingdiv renew"><img
-                        src="https://assets-global.website-files.com/659d238ef90eb981ff6482dd/65f412bd41ce2357f0fb7b17_carbon_renew.svg"
-                        loading="lazy" alt="" class="image-139"></div>
+               <div id="new-renew-id_${serial}" class="settingdiv renew"><img 
+                src="https://assets-global.website-files.com/659d238ef90eb981ff6482dd/6601d357c09775247396ad9d_renewable-energy%20(1).png"
+                loading="lazy" sizes="(max-width: 767px) 15px, (max-width: 991px) 2vw, (max-width: 1279px) 15px, 1vw" 
+                srcset="https://assets-global.website-files.com/659d238ef90eb981ff6482dd/6601d357c09775247396ad9d_renewable-energy%20(1)-p-500.png 500w, https://assets-global.website-files.com/659d238ef90eb981ff6482dd/6601d357c09775247396ad9d_renewable-energy%20(1).png 512w" alt="" class="image-139 edit">
+                </div>
                 <div id="new-share-id_${serial}" class="settingdiv bg-red-100 share"><img
                         src="https://assets-global.website-files.com/659d238ef90eb981ff6482dd/65fbfa5c260243154c1287cb_share.png"
                         loading="lazy"
@@ -125,13 +128,13 @@ const getQRCodeMobileComponent = (doc: any, counter: number) => {
         </div>
     </div>
   <div class="batchdetailsdiv">
-        <div class="text-block-100">Date: <span class="text-span-2">${getCustomDateShape(purchasedDate)}</span></div>
+        <div class="text-block-100">Date: <span class="text-span-2">${fixedPurchasedDate === "-" ? "-" : getCustomDateShape(fixedPurchasedDate)}</span></div>
         <div class="text-block-100">QR Code Type: <span id="type-id${serial}" class="text-span-2">${qrCodeType}</span></div>
         <div class="text-block-100">QR Type: <span class="text-span-2">Dynamic</span></div>
         <div class="text-block-100">Serial NO: <span class="text-span-2">${serial}</span></div>
         <div class="text-block-100">Details: <span class="text-span-3">Scan 3412</span></div>
         <div class="text-block-100">Activated: ${doc.data()["claimed_timestamp"] ? getCustomDateShape(claimedDate) : "-"}</div>
-        <div class="text-block-100">Expire: ${doc.data()["purchased_timestamp"] ? (getCustomDateShape(expiryDate)) : "-"}</div>
+        <div class="text-block-100">Expire: ${doc.data()["life_time_plan"] ? "Life Time" : (doc.data()["purchased_timestamp"] ? (getCustomDateShape(expiryDate)) : "-")}</div>
     </div>
     <div class="w-layout-grid grid-41"><a id="w-node-dd614b2a-841a-967e-9641-4abacefde819-cefde7f2" href="#"
             class="btn-primary myqrcodeedit w-button">Edit</a><a
@@ -299,7 +302,7 @@ export const getBatchAnalyticsById = onCall(async (request) => {
 });
 
 export const getDifferenceDays = (timestamp: number): number => {
-    const date1 = new Date(`${new Date(timestamp).getMonth()}/${new Date(timestamp).getDate()}/${new Date(timestamp).getFullYear() + 1}`);
+    const date1 = new Date(`${new Date(timestamp).getMonth() + 1}/${new Date(timestamp).getDate()}/${new Date(timestamp).getFullYear() + 1}`);
     const date2 = new Date(Date.now());
     const DifferenceInTime = date1.getTime() - date2.getTime();
     console.log("DifferenceInTime = " + DifferenceInTime);
@@ -350,7 +353,7 @@ export const getQRCodeById = onCall(async (request) => {
             const serial = doc.id;
             const purchasedDate = new Date(doc.data()["purchased_timestamp"]);
             const claimedDate = new Date(doc.data()["claimed_timestamp"]);
-            const expiryDate = new Date(`${purchasedDate.getFullYear() + 1}-${purchasedDate.getMonth()}-${purchasedDate.getDate()}`);
+            const expiryDate = new Date(`${purchasedDate.getFullYear() + 1}-${purchasedDate.getMonth() + 1}-${purchasedDate.getDate()}`);
 
             return {
                 "id": serial,
@@ -377,3 +380,58 @@ const makePassword = (length: number) => {
     }
     return result;
 }
+
+export const shareQR = onCall(async (request) => {
+    const email = request.data.shareTo.toLowerCase();
+    const uid = request.data.uid;
+    const qrId = request.data.qr_id;
+
+    return await getUIDFromEmail(email).then(async (result) => {
+        if (result === "Email Not Found!") {
+            return "Email Not Found!";
+        } else {
+            const uidFromEmail = result;
+            return await admin.firestore().collection("qr_codes").doc(qrId).get().then(async (qrR: any) => {
+                if (qrR.exists) {
+                    if (qrR.data()["uid"] === uidFromEmail) {
+                        return "Ambiguity sharing!";
+                    } else if (qrR.data()["uid"] === uid) {
+                        await admin.firestore().collection("qr_codes").doc(qrR.id).update({
+                            uid_email: email,
+                            uid: uidFromEmail,
+                        });
+                        return "The Ownership is moved";
+                    } else {
+                        return "NOT THE OWNER";
+                    }
+                } else {
+                    return "QR NOT EXISTS";
+                }
+            });
+        }
+    });
+});
+
+const getUIDFromEmail = async (email: string) => {
+    return await admin.firestore().collection("users").where("email", "==", email).get().then((result) => {
+        if (result.docs.length === 0) {
+            return "Email Not Found!";
+        } else {
+            return result.docs[0].id;
+        }
+    });
+};
+
+
+// const getURLS = onRequest(async (request, response) => {
+//     const storageRef = await admin.storage().ref("gs://becapy-41703.appspot.com/emojis");
+//     storageRef.listAll().then(function (result) {
+//         result.items.forEach(function (imageRef) {
+//             // And finally display them
+//             displayImage(imageRef);
+//         });
+//     }).catch(function (error) {
+//         // Handle any errors
+//     });
+
+// });

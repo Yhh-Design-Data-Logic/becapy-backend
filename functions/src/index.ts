@@ -20,6 +20,7 @@ export {
     createBulkQRCode, createQRCodeRelatedToBulk,
     triggerOnDeleteBulk, getBatchById,
     getBatchAnalyticsById, getQRCodeById,
+    shareQR,
 } from "./qr_codes/qr";
 
 export { createWifiQRCode, updateWifiQRCode } from "./qr_codes/wifi";
