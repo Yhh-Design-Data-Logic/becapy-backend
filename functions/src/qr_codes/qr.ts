@@ -14,7 +14,21 @@ export const claimQRCode = onCall(async (request) => {
 
     try {
         await admin.firestore().collection("qr_codes").doc(serial).get().then(async (doc: any) => {
-            if (doc.exists && doc.data()["uid"] === userId) {
+            if (doc.exists && doc.data()["shared_to_uid"] === userId) {
+                if (doc.data()["password"] === password) {
+                    const emailFromUID = await getEmailFromUID(userId);
+                    await admin.firestore().collection("qr_codes").doc(serial)
+                        .update({
+                            "uid": userId,
+                            "uid_email": emailFromUID,
+                        });
+                    message = "Congratulations";
+                    return "Congratulations!";
+                } else {
+                    message = "Password not correct!";
+                    return "Password not correct!";
+                }
+            } else if (doc.exists && doc.data()["uid"] === userId) {
                 if (doc.data()["password"] === password) {
                     await admin.firestore().collection("qr_codes").doc(serial)
                         .update({
@@ -395,10 +409,14 @@ export const shareQR = onCall(async (request) => {
                 if (qrR.exists) {
                     if (qrR.data()["uid"] === uidFromEmail) {
                         return "Ambiguity sharing!";
+                    } else if (qrR.data()["shared_timestamp"] || qrR.data()["is_shared"]) {
+                        return "This QR Code has been shared before!";
                     } else if (qrR.data()["uid"] === uid) {
                         await admin.firestore().collection("qr_codes").doc(qrR.id).update({
-                            uid_email: email,
-                            uid: uidFromEmail,
+                            // uid_email: email,
+                            // uid: uidFromEmail,
+                            shared_to_uid: uidFromEmail,
+                            shared_timestamp: Date.now(),
                         });
                         return "The Ownership is moved";
                     } else {
@@ -422,16 +440,8 @@ const getUIDFromEmail = async (email: string) => {
     });
 };
 
-
-// const getURLS = onRequest(async (request, response) => {
-//     const storageRef = await admin.storage().ref("gs://becapy-41703.appspot.com/emojis");
-//     storageRef.listAll().then(function (result) {
-//         result.items.forEach(function (imageRef) {
-//             // And finally display them
-//             displayImage(imageRef);
-//         });
-//     }).catch(function (error) {
-//         // Handle any errors
-//     });
-
-// });
+const getEmailFromUID = async (uid: string) => {
+    return await admin.firestore().collection("users").doc(uid).get().then((result: any) => {
+        return result.data()["email"];
+    });
+};
