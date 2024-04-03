@@ -1,9 +1,11 @@
+/* eslint-disable no-var */
 /* eslint-disable max-len */
-import { onCall, onRequest } from "firebase-functions/v2/https";
+import { onCall } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 // import * as functions from "firebase-functions";
 import { onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { getCustomDateShape } from "../utils/custom_date_formatter";
+import { sendSharingMessageToEmail } from "../mailer";
 
 export const claimQRCode = onCall(async (request) => {
     var serial = request.data.serial;
@@ -14,7 +16,25 @@ export const claimQRCode = onCall(async (request) => {
 
     try {
         await admin.firestore().collection("qr_codes").doc(serial).get().then(async (doc: any) => {
-            if (doc.exists && doc.data()["shared_to_uid"] === userId) {
+            // Case for sharing QR Code with User not exists in the DB.
+            if (doc.exists && doc.data()["shared_to_uid"] === "00000000") {
+                const emailFromUID = await getEmailFromUID(userId);
+                if (doc.data()["password"] === password && doc.data()["shared_to_email_uid"] === emailFromUID) {
+                    await admin.firestore().collection("qr_codes").doc(serial)
+                        .update({
+                            "shared_to_uid": userId,
+                            "uid": userId,
+                            "uid_email": emailFromUID,
+                        });
+                    message = "Congratulations";
+                    return "Congratulations!";
+                } else {
+                    message = "Password not correct!";
+                    return "Password not correct!";
+                }
+            }
+            // Case for sharing QR Code with User exists in the DB.
+            else if (doc.exists && doc.data()["shared_to_uid"] === userId) {
                 if (doc.data()["password"] === password) {
                     const emailFromUID = await getEmailFromUID(userId);
                     await admin.firestore().collection("qr_codes").doc(serial)
@@ -28,7 +48,9 @@ export const claimQRCode = onCall(async (request) => {
                     message = "Password not correct!";
                     return "Password not correct!";
                 }
-            } else if (doc.exists && doc.data()["uid"] === userId) {
+            }
+            // Case for normal claiming QR Code.
+            else if (doc.exists && doc.data()["uid"] === userId) {
                 if (doc.data()["password"] === password) {
                     await admin.firestore().collection("qr_codes").doc(serial)
                         .update({
@@ -53,6 +75,8 @@ export const claimQRCode = onCall(async (request) => {
 });
 
 export const getUserQrCodes = onCall(async (request) => {
+    let cleaing24Hours = false;
+
     var userId = request.data.user_id;
     var isWeb = request.data.is_web;
     var counter = 0;
@@ -62,32 +86,53 @@ export const getUserQrCodes = onCall(async (request) => {
     await qrCodesRef.where("uid", "==", userId).get()
         .then((querySnapshot) => {
             querySnapshot.forEach((doc) => {
-                counter = counter + 1;
-                var component = isWeb ? getQRCodeMobileComponent(doc, counter) : getQRCodeMobileComponent(doc, counter);
-                myCreatedQRCodes.push({
-                    "component": component,
-                    "serial": doc.id,
-                    "type": doc.data()["type"],
-                });
-                console.log(doc.id, " => ", doc.data());
+                console.log("doc.id = " + doc.id);
+                cleaing24Hours = false;
+                if (doc.data()["shared_timestamp"] && checkIfTimeStampMore24Hours(doc.data()["shared_timestamp"])) {
+                    cleaing24Hours = true;
+                    console.log("24 hours condition   -->   doc.id = " + doc.id);
+                    qrCodesRef.doc(doc.id).update({
+                        shared_to_uid: admin.firestore.FieldValue.delete(),
+                        shared_to_email_uid: admin.firestore.FieldValue.delete(),
+                        shared_timestamp: admin.firestore.FieldValue.delete(),
+                        is_shared: admin.firestore.FieldValue.delete(),
+                    });
+                }
+                if (doc.data()["shared_to_uid"] && (doc.data()["shared_to_uid"] !== doc.data()["uid"])) {
+                    console.log("SHARING PENDING!   -->   doc.id = " + doc.id);
+                }
+                if (
+                    (doc.data()["shared_to_uid"] && (doc.data()["shared_to_uid"] === doc.data()["uid"])) ||
+                    (doc.data()["shared_to_uid"] && (doc.data()["shared_to_uid"] !== doc.data()["uid"]) && cleaing24Hours) ||
+                    !doc.data()["shared_to_uid"]
+                ) {
+                    console.log("NORMAL   -->   doc.id = " + doc.id);
+                    counter = counter + 1;
+                    var component = isWeb ? getQRCodeMobileComponent(doc, counter) : getQRCodeMobileComponent(doc, counter);
+                    myCreatedQRCodes.push({
+                        "component": component,
+                        "serial": doc.id,
+                        "type": doc.data()["type"],
+                    });
+                }
             });
         });
 
-    await qrCodesRef.where("corporate_id", "==", userId).get()
-        .then((querySnapshot) => {
-            querySnapshot.forEach((doc) => {
-                counter = counter + 1;
-                var component = isWeb ? getQRCodeMobileComponent(doc, counter) : getQRCodeMobileComponent(doc, counter);
-                myCreatedQRCodesByBulk.push({
-                    "component": component,
-                    "serial": doc.id,
-                    "type": doc.data()["type"],
-                    "claimed_timestamp": doc.data()["claimed_timestamp"],
-                    "purchased_timestamp": doc.data()["purchased_timestamp"],
-                });
-                console.log(doc.id, " => ", doc.data());
-            });
-        });
+    // await qrCodesRef.where("corporate_id", "==", userId).get()
+    //     .then((querySnapshot) => {
+    //         querySnapshot.forEach((doc) => {
+    //             counter = counter + 1;
+    //             var component = isWeb ? getQRCodeMobileComponent(doc, counter) : getQRCodeMobileComponent(doc, counter);
+    //             myCreatedQRCodesByBulk.push({
+    //                 "component": component,
+    //                 "serial": doc.id,
+    //                 "type": doc.data()["type"],
+    //                 "claimed_timestamp": doc.data()["claimed_timestamp"],
+    //                 "purchased_timestamp": doc.data()["purchased_timestamp"],
+    //             });
+    //             console.log(doc.id, " => ", doc.data());
+    //         });
+    //     });
     return { "created": myCreatedQRCodes, "created_by_bulk": myCreatedQRCodesByBulk, "user_id": userId, "is_web": isWeb, "count": counter };
 });
 
@@ -402,7 +447,26 @@ export const shareQR = onCall(async (request) => {
 
     return await getUIDFromEmail(email).then(async (result) => {
         if (result === "Email Not Found!") {
-            return "Email Not Found!";
+            return await admin.firestore().collection("qr_codes").doc(qrId).get().then(async (qrR: any) => {
+                if (qrR.exists) {
+                    if (qrR.data()["shared_timestamp"] || qrR.data()["is_shared"]) {
+                        return "This QR Code has been shared before!";
+                    } else if (qrR.data()["uid"] === uid) {
+                        await admin.firestore().collection("qr_codes").doc(qrR.id).update({
+                            shared_to_email_uid: email,
+                            shared_to_uid: "00000000",
+                            shared_timestamp: Date.now(),
+                            is_shared: true,
+                        });
+                        sendSharingMessageToEmail(email, qrR.id, qrR.data()["password"], qrR.data()["uid_email"], true);
+                        return "The Ownership is moved!, QR Code will be back to you if the he dosen't claim it in 24 hours!";
+                    } else {
+                        return "NOT THE OWNER";
+                    }
+                } else {
+                    return "QR NOT EXISTS";
+                }
+            });
         } else {
             const uidFromEmail = result;
             return await admin.firestore().collection("qr_codes").doc(qrId).get().then(async (qrR: any) => {
@@ -415,10 +479,13 @@ export const shareQR = onCall(async (request) => {
                         await admin.firestore().collection("qr_codes").doc(qrR.id).update({
                             // uid_email: email,
                             // uid: uidFromEmail,
+                            shared_to_email_uid: email,
                             shared_to_uid: uidFromEmail,
                             shared_timestamp: Date.now(),
+                            is_shared: true,
                         });
-                        return "The Ownership is moved";
+                        sendSharingMessageToEmail(email, qrR.id, qrR.data()["password"], qrR.data()["uid_email"], false);
+                        return "The Ownership is moved!, QR Code will be back to you if the he dosen't claim it in 24 hours!";
                     } else {
                         return "NOT THE OWNER";
                     }
@@ -444,4 +511,14 @@ const getEmailFromUID = async (uid: string) => {
     return await admin.firestore().collection("users").doc(uid).get().then((result: any) => {
         return result.data()["email"];
     });
+};
+
+const checkIfTimeStampMore24Hours = (timestamp: number) => {
+    const yourDateMilliseconds = new Date(timestamp).getTime();
+    const actualTimeMilliseconds = new Date().getTime();
+    if ((actualTimeMilliseconds - yourDateMilliseconds) > 86400000) {
+        return true;
+    } else {
+        return false;
+    }
 };
